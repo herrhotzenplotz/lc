@@ -70,7 +70,7 @@ instance MonadFail Parser where
 expectChar :: Char -> Parser ()
 expectChar c =
   Parser $ \case
-    (c'):rest
+    c':rest
       | c' == c -> Right (rest, ())
     _ -> Left $ SyntaxError ("Expected '" <> [c] <> "'")
 
@@ -180,11 +180,11 @@ bind name body = do
 release :: String -> StateT Scope IO ()
 release binding = do
   globalScope <- get
-  case M.member binding globalScope of
-    True -> do
+  if M.member binding globalScope
+    then do
       put $ M.delete binding globalScope
       lift $ putStrLn $ ":: '" <> binding <> "' has been released."
-    False -> lift $ putStrLn $ "?: '" <> binding <> "': No such binding ."
+    else lift $ putStrLn $ "?: '" <> binding <> "': No such binding ."
 
 printError :: InterpreterError -> StateT Scope IO ()
 printError err = lift $ putStrLn $ "?: " <> printE err
@@ -212,7 +212,7 @@ repl :: StateT Scope IO ()
 repl = do
   lift $ putStr "> "
   lift $ hFlush stdout
-  inp <- lift $ getLine
+  inp <- lift getLine
   let p = runParser parseInterpreterCommand inp
   case p of
     Left err -> printError err
@@ -221,7 +221,7 @@ repl = do
         EvalCommand term -> eval term
         LetBinding binding term -> bind binding term
         Release binding -> release binding
-      if resStr == []
+      if null resStr
         then return ()
         else lift $ putStrLn $ "Warning: Incomplete parse: " <> resStr
   repl
