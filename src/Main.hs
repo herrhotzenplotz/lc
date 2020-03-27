@@ -12,6 +12,7 @@ import Data.Char
 import qualified Data.Map.Strict as M
 import Data.Version (showVersion)
 import Paths_lc (version)
+import System.Console.ANSI
 import System.IO (hFlush, stdout)
 
 data Term
@@ -154,12 +155,12 @@ interpretScoped _ closure = return closure
 printT :: Term -> String
 printT (Application f val) = "(" <> printT f <> " " <> printT val <> ")"
 printT (Abstraction b body) = "\\" <> b <> "." <> printT body
-printT (Closure b body e) = (if M.null e then [] else ['\'']) <> "\\" <> b <> "." <> printT body
+printT (Closure b body e) =
+  (if M.null e
+     then []
+     else ['\'']) <>
+  "\\" <> b <> "." <> printT body
 printT (Variable x) = x
-
-printE :: InterpreterError -> String
-printE (SemanticError x) = "Semantic error: " <> x
-printE (SyntaxError x) = "Syntactic error: " <> x
 
 eval :: Term -> StateT Scope IO ()
 eval inp = do
@@ -184,10 +185,24 @@ release binding = do
     then do
       put $ M.delete binding globalScope
       lift $ putStrLn $ ":: '" <> binding <> "' has been released."
-    else lift $ putStrLn $ "?: '" <> binding <> "': No such binding ."
+    else lift $ do
+      setSGR [SetColor Foreground Vivid Red]
+      putStrLn $ "?: '" <> binding <> "': No such binding."
+      setSGR []
 
 printError :: InterpreterError -> StateT Scope IO ()
-printError err = lift $ putStrLn $ "?: " <> printE err
+printError err =
+  lift $ do
+    setSGR [SetColor Foreground Vivid Red]
+    case err of
+      SemanticError x -> do
+        putStr "?: Semantic error: "
+        setSGR []
+        putStrLn x
+      SyntaxError x -> do
+        putStr "?: Syntactic error: "
+        setSGR []
+        putStrLn x
 
 parseLetBinding :: Parser InterpreterCommand
 parseLetBinding = do
@@ -206,7 +221,7 @@ parseEvalCommand = EvalCommand <$> parseTerm
 
 parseInterpreterCommand :: Parser InterpreterCommand
 parseInterpreterCommand =
-  parseLetBinding <|> parseReleaseCommand <|> parseEvalCommand
+    parseReleaseCommand <|> parseLetBinding <|> parseEvalCommand
 
 repl :: StateT Scope IO ()
 repl = do
@@ -223,7 +238,10 @@ repl = do
         Release binding -> release binding
       if null resStr
         then return ()
-        else lift $ putStrLn $ "Warning: Incomplete parse: " <> resStr
+        else lift $ do
+           setSGR [SetColor Foreground Vivid Magenta]
+           putStrLn $ "Warning: Incomplete parse: " <> resStr
+           setSGR []
   repl
 
 main :: IO ()
