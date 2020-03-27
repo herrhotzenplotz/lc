@@ -1,0 +1,39 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 11931998cd312cb82ba3c8d5895362ed731037c9ceca4b869bb88cf593301b5e
+
+name:           lc
+version:        0.1.0.0
+description:    Lambda calculus interpreter
+homepage:       https://github.com/herrhotzenplotz/lc#readme
+bug-reports:    https://github.com/herrhotzenplotz/lc/issues
+author:         Nico Sonack
+copyright:      2020 Nico Sonack
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+executable lc
+  main-is: Main.hs
+  other-modules:
+      Paths_lc
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+               -Werror
+               -threaded
+               -rtsopts
+               -with-rtsopts=-N
+               -fwarn-incomplete-patterns
+               -fwarn-incomplete-uni-patterns
+  build-depends:
+      base >=4.7 && <5
+    , containers >= 0.6 && < 0.7
+  default-language: Haskell2010
