@@ -162,8 +162,11 @@ eval inp = do
 bind :: String -> Term -> StateT Scope IO ()
 bind name body = do
   globalScope <- get
-  put $ M.insert name body globalScope
-  lift $ putStrLn $ ":: '" <> name <> "' has been bound."
+  case interpretScoped globalScope body of
+    Right result -> do
+      put $ M.insert name result globalScope
+      lift $ putStrLn $ ":: '" <> name <> "' has been bound."
+    Left err -> printError err
 
 release :: String -> StateT Scope IO ()
 release binding = do
