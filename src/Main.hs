@@ -5,19 +5,14 @@
 module Main where
 
 import Control.Applicative
+import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 import Data.Char
 import qualified Data.Map.Strict as M
 import Data.Version (showVersion)
 import System.IO (hFlush, stdout)
 import Paths_lc (version)
-
-data Token
-    = Identifier String
-    | Lambda
-    | OpenParen
-    | CloseParen
-    | Dot
-      deriving (Show, Eq)
 
 data Term
     = Variable String
@@ -33,10 +28,17 @@ data InterpreterError
 
 newtype Parser a
     = Parser {
-        runParser :: [Token] -> Either InterpreterError ([Token], a)
+        runParser :: String -> Either InterpreterError (String, a)
       } deriving Functor
 
 type Scope = M.Map String Term
+
+type InterpreterResult = Either InterpreterError Term
+
+data InterpreterCommand
+    = LetBinding String Term
+    | Release String
+    | EvalCommand Term
 
 instance Applicative Parser where
     pure x = Parser $ \input -> Right (input, x)
@@ -60,56 +62,44 @@ instance Monad Parser where
                           runParser (f a) input'
 
 instance MonadFail Parser where
-    fail m = Parser $ const $ Left $ SemanticError m
+    fail m = Parser $ const $ Left $ SyntaxError m
 
-tokenize :: String -> Either InterpreterError [Token]
-tokenize input = case tokenizeSingle input of
-                   Left e -> Left e
-                   Right (token, []) -> Right $ return token
-                   Right (token, rest) -> do
-                     parsedRest <- tokenize rest
-                     return $ token : parsedRest
-    where tokenizeSingle :: String -> Either InterpreterError (Token, String)
-          tokenizeSingle (x : rest) | isSpace x = tokenizeSingle rest
-          tokenizeSingle ('\\' : rest) = return (Lambda, rest)
-          tokenizeSingle ('.' : rest) = return (Dot, rest)
-          tokenizeSingle ('(' : rest) = return (OpenParen, rest)
-          tokenizeSingle (')' : rest) = return (CloseParen, rest)
-          tokenizeSingle maybeString = case span isAlphaNum maybeString of
-                                         ([], []) -> Left $ SyntaxError "Unexpected EOF"
-                                         ([], gibberish) -> Left $ SyntaxError ("Unexpected '" <> [head gibberish, '\''])
-                                         (token, rest) -> return (Identifier token, rest)
-
-parseVariable :: Parser Term
-parseVariable = Parser $ \case
-                  (Identifier x):restToks -> Right (restToks, Variable x)
-                  h:_ -> Left $ SemanticError ("Unexpected " <> show h)
-                  [] -> Left $ SemanticError "Expected variable"
+expectChar :: Char -> Parser ()
+expectChar c = Parser $ \case
+               (c'):rest | c' == c -> Right (rest, ())
+               _ -> Left $ SyntaxError ("Expected '" <> [c] <> "'")
 
 expectOP :: Parser ()
-expectOP = Parser $ \case
-           OpenParen:restToks -> Right (restToks, ())
-           h:_ -> Left $ SyntaxError ("Expected '(' but got '" <> show h <> "' instead")
-           [] -> Left $ SemanticError "Expected '('"
+expectOP = expectChar '('
+
+ws :: Parser ()
+ws = void $
+     many $
+     Parser (\case
+              x:xs | isSpace x -> Right (xs, ())
+              _ -> Left $ SyntaxError "Expected whitespace")
 
 expectCP :: Parser ()
-expectCP = Parser $ \case
-           CloseParen:restToks -> Right (restToks, ())
-           h:_ -> Left $ SyntaxError ("Expected ')' but got '" <> show h <> "' instead")
-           [] -> Left $ SemanticError "Expected ')'"
-
-expectDot :: Parser ()
-expectDot = Parser $ \case
-            Dot:restToks -> Right (restToks, ())
-            h:_ -> Left $ SyntaxError ("Expected '.' but got '" <> show h <> "' instead")
-            [] -> Left $ SemanticError "Expected '.'"
+expectCP = expectChar ')'
 
 expectLambda :: Parser ()
-expectLambda = Parser $ \case
-               Lambda:restToks -> Right (restToks, ())
-               h:_ -> Left $ SyntaxError ("Expected '\\' but got '" <> show h <> "' instead")
-               [] -> Left $ SemanticError "Expected '\\'"
+expectLambda = expectChar '\\'
 
+expectDot :: Parser ()
+expectDot = expectChar '.'
+
+parseIdentifier :: Parser String
+parseIdentifier = Parser $ \inp ->
+                  case span isAlphaNum inp of
+                    ([], rest) -> Left $ SyntaxError ("Expected an identifier but got '" <> rest)
+                    (identifier, rest) -> Right (rest, identifier)
+
+expectString :: String -> Parser ()
+expectString expect = do
+  got <- parseIdentifier
+  if got == expect
+  then return ()
+  else fail $ "Expected '" <> expect <> "' bot got '" <> got <> "'"
 
 parseApplication :: Parser Term
 parseApplication = do
@@ -121,15 +111,17 @@ parseApplication = do
 
 parseAbstraction :: Parser Term
 parseAbstraction = do
+  ws
   expectLambda
   (Variable boundVar) <- parseVariable
   expectDot
   Abstraction boundVar <$> parseTerm
 
-parseTerm :: Parser Term
-parseTerm = parseApplication <|> parseAbstraction <|> parseVariable
+parseVariable :: Parser Term
+parseVariable = Variable <$> parseIdentifier
 
-type InterpreterResult = Either InterpreterError Term
+parseTerm :: Parser Term
+parseTerm = ws *> (parseApplication <|> parseAbstraction <|> parseVariable) <* ws
 
 interpretScoped :: Scope -> Term -> InterpreterResult
 interpretScoped scope (Variable v) = case M.lookup v scope of
@@ -150,9 +142,6 @@ interpretScoped scope (Application f val) = do
 
 interpretScoped _ closure = return closure
 
-interpret :: Term -> InterpreterResult
-interpret = interpretScoped M.empty
-
 printT :: Term -> String
 printT (Application f val) = "(" <> printT f <> " " <> printT val <> ")"
 printT (Abstraction b body) = "\\" <> b <> "." <> printT body
@@ -163,18 +152,66 @@ printE :: InterpreterError -> String
 printE (SemanticError x) = "Semantic error: " <> x
 printE (SyntaxError x) = "Syntactic error: " <> x
 
-repl :: IO ()
+eval :: Term -> StateT Scope IO ()
+eval inp = do
+  scope <- get
+  case interpretScoped scope inp of
+    Right result -> lift $ putStrLn $ ":: " <> printT result
+    Left err -> printError err
+
+bind :: String -> Term -> StateT Scope IO ()
+bind name body = do
+  globalScope <- get
+  put $ M.insert name body globalScope
+  lift $ putStrLn $ ":: '" <> name <> "' has been bound."
+
+release :: String -> StateT Scope IO ()
+release binding = do
+  globalScope <- get
+  case M.member binding globalScope of
+    True -> do
+      put $ M.delete binding globalScope
+      lift $ putStrLn $ ":: '" <> binding <> "' has been released."
+    False ->
+      lift $ putStrLn $ "?: '" <> binding <> "': No such binding ."
+
+printError :: InterpreterError -> StateT Scope IO ()
+printError err = lift $ putStrLn $ "?: " <> printE err
+
+parseLetBinding :: Parser InterpreterCommand
+parseLetBinding = do
+  ws *> expectString "let" <* ws
+  binding <- ws *> parseIdentifier <* ws
+  expectChar '='
+  LetBinding binding <$> parseTerm
+
+parseReleaseCommand :: Parser InterpreterCommand
+parseReleaseCommand = do
+  ws *> expectString "release" <* ws
+  Release <$> parseIdentifier
+
+parseEvalCommand :: Parser InterpreterCommand
+parseEvalCommand = EvalCommand <$> parseTerm
+
+parseInterpreterCommand :: Parser InterpreterCommand
+parseInterpreterCommand = parseLetBinding <|> parseReleaseCommand <|> parseEvalCommand
+
+repl :: StateT Scope IO ()
 repl = do
-  putStr "> "
-  hFlush stdout
-  inp <- getLine
-  let r = do
-         toks <- tokenize inp
-         parseRes <- runParser parseTerm toks
-         interpret $ snd parseRes
-  case r of
-    Right result -> putStrLn $ ":: " <> printT result
-    Left err -> putStrLn $ "?: " <> printE err
+  lift $ putStr "> "
+  lift $ hFlush stdout
+  inp <- lift $ getLine
+  let p = runParser parseInterpreterCommand inp
+  case p of
+    Left err -> printError err
+    Right (resStr, command) -> do
+        case command of
+          EvalCommand term -> eval term
+          LetBinding binding term -> bind binding term
+          Release binding -> release binding
+        if resStr == []
+        then return ()
+        else lift $ putStrLn $ "Warning: Incomplete parse: " <> resStr
   repl
 
 main :: IO ()
@@ -182,4 +219,4 @@ main = do
   putStrLn "lc - untyped lambda calculus interpreter"
   putStrLn $ "Version " <> showVersion version
   putStrLn "Copyright 2020 by Nico Sonack\n"
-  repl
+  fst <$> runStateT repl M.empty
