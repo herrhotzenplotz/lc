@@ -101,7 +101,7 @@ parseIdentifier =
   Parser $ \inp ->
     case span isAlphaNum inp of
       ([], rest) ->
-        Left $ SyntaxError ("Expected an identifier but got '" <> rest)
+        Left $ SyntaxError ("Expected an identifier but got '" <> rest <> "'")
       (identifier, rest) -> Right (rest, identifier)
 
 expectString :: String -> Parser ()
@@ -154,7 +154,7 @@ interpretScoped _ closure = return closure
 printT :: Term -> String
 printT (Application f val) = "(" <> printT f <> " " <> printT val <> ")"
 printT (Abstraction b body) = "\\" <> b <> "." <> printT body
-printT (Closure b body _) = "\\" <> b <> "." <> printT body
+printT (Closure b body e) = (if M.null e then [] else ['\'']) <> "\\" <> b <> "." <> printT body
 printT (Variable x) = x
 
 printE :: InterpreterError -> String
