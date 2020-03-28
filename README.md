@@ -2,6 +2,8 @@
 
 Just something I did in my spare time.
 
+![](docs/screenshot.png)
+
 ## Quick start
 
 ```bash
