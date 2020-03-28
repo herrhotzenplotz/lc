@@ -152,21 +152,29 @@ interpretScoped scope (Application f val) = do
     _ -> Left $ SemanticError "Cannot apply non-function values"
 interpretScoped _ closure = return closure
 
-printT :: Term -> String
-printT (Application f val) = "(" <> printT f <> " " <> printT val <> ")"
-printT (Abstraction b body) = "\\" <> b <> "." <> printT body
-printT (Closure b body e) =
-  (if M.null e
-     then []
-     else ['\'']) <>
-  "\\" <> b <> "." <> printT body
-printT (Variable x) = x
+printT :: Term -> StateT Scope IO String
+printT (Application f val) = do
+  f' <- printT f
+  val' <- printT val
+  return $ "(" <> f' <> " " <> val' <> ")"
+printT (Abstraction b body) = do
+  body' <- printT body
+  return $ "\\" <> b <> "." <> body'
+printT (Closure b body e) = do
+  globalScope <- get
+  body' <- printT body
+  return $
+    (['\'' | not (M.null (e M.\\ globalScope))]) <>
+    "\\" <> b <> "." <> body'
+printT (Variable x) = return x
 
 eval :: Term -> StateT Scope IO ()
 eval inp = do
   scope <- get
   case interpretScoped scope inp of
-    Right result -> lift $ putStrLn $ ":: " <> printT result
+    Right result -> do
+      result' <- printT result
+      lift $ putStrLn $ ":: " <> result'
     Left err -> printError err
 
 bind :: String -> Term -> StateT Scope IO ()
@@ -186,9 +194,9 @@ release binding = do
       put $ M.delete binding globalScope
       lift $ putStrLn $ ":: '" <> binding <> "' has been released."
     else lift $ do
-      setSGR [SetColor Foreground Vivid Red]
-      putStrLn $ "?: '" <> binding <> "': No such binding."
-      setSGR []
+           setSGR [SetColor Foreground Vivid Red]
+           putStrLn $ "?: '" <> binding <> "': No such binding."
+           setSGR []
 
 printError :: InterpreterError -> StateT Scope IO ()
 printError err =
@@ -221,7 +229,7 @@ parseEvalCommand = EvalCommand <$> parseTerm
 
 parseInterpreterCommand :: Parser InterpreterCommand
 parseInterpreterCommand =
-    parseReleaseCommand <|> parseLetBinding <|> parseEvalCommand
+  parseReleaseCommand <|> parseLetBinding <|> parseEvalCommand
 
 repl :: StateT Scope IO ()
 repl = do
@@ -239,9 +247,9 @@ repl = do
       if null resStr
         then return ()
         else lift $ do
-           setSGR [SetColor Foreground Vivid Magenta]
-           putStrLn $ "Warning: Incomplete parse: " <> resStr
-           setSGR []
+               setSGR [SetColor Foreground Vivid Magenta]
+               putStrLn $ "Warning: Incomplete parse: " <> resStr
+               setSGR []
   repl
 
 main :: IO ()
