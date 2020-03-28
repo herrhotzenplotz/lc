@@ -1,0 +1,8 @@
+let true = \x.\y.x
+let false = \x.\y.y
+let not = \b.((b false) true)
+let or = \a.\b.((a true) b)
+let and = \a.\b.((a b) false)
+let eq = \a.\b.((a b) (not b))
+let xor = \a.\b.((a (not b)) b)
+let implies = \a.\b.((a b) true)
