@@ -7,7 +7,7 @@ cabal-version: 1.12
 -- hash: 11931998cd312cb82ba3c8d5895362ed731037c9ceca4b869bb88cf593301b5e
 
 name:           lc
-version:        0.1.0.2
+version:        0.1.1.5
 description:    Lambda calculus interpreter
 homepage:       https://github.com/herrhotzenplotz/lc#readme
 bug-reports:    https://github.com/herrhotzenplotz/lc/issues
@@ -24,6 +24,10 @@ executable lc
   main-is: Main.hs
   other-modules:
       Paths_lc
+    , Types
+    , Error
+    , Parser
+    , Interpreter
   hs-source-dirs:
       src
   ghc-options: -Wall
