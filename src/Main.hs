@@ -22,14 +22,14 @@ import System.IO (hFlush, stdout)
 
 runLine :: String -> StateT Scope IO ()
 runLine inp =
-    case runParser parseInterpreterCommand inp of
-      Left err -> printError err
-      Right (resStr, command) -> do
-        case command of
-          EvalCommand term -> eval term
-          LetBinding binding term -> bind binding term
-          Release binding -> release binding
-        if null resStr
+  case runParser parseInterpreterCommand inp of
+    Left err -> printError err
+    Right (resStr, command) -> do
+      case command of
+        EvalCommand term -> eval term
+        LetBinding binding term -> bind binding term
+        Release binding -> release binding
+      if null resStr
         then return ()
         else lift $ do
                setSGR [SetColor Foreground Vivid Magenta]

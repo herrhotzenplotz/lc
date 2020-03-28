@@ -8,7 +8,13 @@ import Control.Applicative (Alternative(..))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import qualified Data.Map.Strict as M
-import System.Console.ANSI (setSGR, SGR(..), ConsoleLayer(..), ColorIntensity(..), Color(..))
+import System.Console.ANSI
+  ( Color(..)
+  , ColorIntensity(..)
+  , ConsoleLayer(..)
+  , SGR(..)
+  , setSGR
+  )
 
 type InterpreterResult = Either InterpreterError Term
 
@@ -71,8 +77,7 @@ showTerm (Closure b body e) = do
   globalScope <- get
   body' <- showTerm body
   return $
-    (['\'' | not (M.null (e M.\\ globalScope))]) <>
-    "\\" <> b <> "." <> body'
+    (['\'' | not (M.null (e M.\\ globalScope))]) <> "\\" <> b <> "." <> body'
 showTerm (Variable x) = return x
 
 interpretScoped :: Scope -> Term -> InterpreterResult
