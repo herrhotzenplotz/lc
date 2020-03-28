@@ -15,6 +15,18 @@ $ stack run
 
 + `(\x.x \y.y)`
 + `((\x.\y.(x y) \f.f) \r.r)`
++ `let true = \x.\y.x`
++ `let false = \x.\y.y`
++ `let not = \b.((b false) true)`
++ `(not false)`
+
+## Notes
+Because the interpreter internally uses closures, you might sometimes
+be getting seemingly incorrect results. These results should start
+with a `'` sign, showing that this result still has values bound in
+the closure, that have not yet been applied. This is the lazy
+evaluation mechanism. To force a result, simply apply an identity
+function or something else to force the lazy thunk to evaluate.
 
 ## Contributions
 
