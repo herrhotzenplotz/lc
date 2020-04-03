@@ -40,7 +40,10 @@ repl :: StateT Scope IO ()
 repl = do
   lift $ putStr "> "
   lift $ hFlush stdout
-  lift getLine >>= runLine
+  input <- lift getLine
+  case input of
+    [] -> return ()
+    someInput -> runLine someInput
   repl
 
 interpretFile :: String -> StateT Scope IO ()
