@@ -24,12 +24,11 @@ data InterpreterCommand
   | EvalCommand Term
 
 parseApplication :: Parser Term
-parseApplication = do
-  expectOP
-  t1 <- parseTerm
-  t2 <- parseTerm
-  expectCP
-  return $ Application t1 t2
+parseApplication =
+  parenthesized $ do
+    t1 <- parseTerm
+    t2 <- parseTerm
+    return $ Application t1 t2
 
 parseAbstraction :: Parser Term
 parseAbstraction = do

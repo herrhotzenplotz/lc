@@ -71,6 +71,8 @@ parseIdentifier =
       ([], rest) ->
         Left $ SyntaxError ("Expected an identifier but got '" <> rest <> "'")
       (identifier, rest) -> Right (rest, identifier)
+parenthesized :: Parser a -> Parser a
+parenthesized p = expectOP *> p <* expectCP
 
 expectString :: String -> Parser ()
 expectString expect = do
