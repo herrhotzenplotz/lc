@@ -14,13 +14,25 @@ import System.Console.ANSI
   )
 import Types
 
+data ErrorMessage =
+  ErrorMessage
+    { errorMessageText :: String
+    , errorMessageFile :: String
+    , errorMessageLine :: Int
+    , errorMessageColumn :: Int
+    }
+
+instance Show ErrorMessage where
+    show (ErrorMessage msg file line col) = file <> ":" <> (show line) <> ":" <> (show col) <> ": " <> msg
+
 data InterpreterError
-  = SyntaxError String
+  = SyntaxError ErrorMessage
   | SemanticError String
+  | InternalError String
   deriving (Show)
 
 instance Alternative (Either InterpreterError) where
-  empty = Left $ SemanticError "Empty error"
+  empty = Left $ SyntaxError $ ErrorMessage "Empty error" "no-file" 0 0
   Left _ <|> err = err
   ei1 <|> _ = ei1
 
@@ -30,10 +42,9 @@ printError err =
     setSGR [SetColor Foreground Vivid Red]
     case err of
       SemanticError x -> do
-        putStr "?: Semantic error: "
-        setSGR []
-        putStrLn x
+        putStrLn $ show x
       SyntaxError x -> do
-        putStr "?: Syntactic error: "
-        setSGR []
-        putStrLn x
+        putStrLn $ show x
+      InternalError msg ->
+        putStr $ "?: Internal interpreter error: " <> msg
+    setSGR []

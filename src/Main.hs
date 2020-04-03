@@ -20,20 +20,24 @@ import System.Console.ANSI
 import System.Environment (getArgs)
 import System.IO (hFlush, stdout)
 
-runLine :: String -> StateT Scope IO ()
-runLine inp =
-  case runParser parseInterpreterCommand inp of
+runLine :: FilePath -> String -> StateT Scope IO ()
+runLine path inp =
+  case runParser parseInterpreterCommand $ ParserInputStream 0 inp path of
     Left err -> printError err
     Right (resStr, command) -> do
       case command of
         EvalCommand term -> eval term
         LetBinding binding term -> bind binding term
         Release binding -> release binding
-      if null resStr
+      if null $ streamBegin resStr
         then return ()
         else lift $ do
                setSGR [SetColor Foreground Vivid Magenta]
-               putStrLn $ "Warning: Incomplete parse: " <> resStr
+               putStrLn $
+                 path <>
+                 ":" <>
+                 (show $ streamPosition resStr) <>
+                 ": Warning: Incomplete parse: " <> (streamBegin resStr)
                setSGR []
 
 repl :: StateT Scope IO ()
@@ -43,14 +47,14 @@ repl = do
   input <- lift getLine
   case input of
     [] -> return ()
-    someInput -> runLine someInput
+    someInput -> runLine "<interactive>" someInput
   repl
 
-interpretFile :: String -> StateT Scope IO ()
+interpretFile :: FilePath -> StateT Scope IO ()
 interpretFile filePath = do
   lift $ putStrLn $ "Loading file '" <> filePath <> "'"
   code <- lift $ lines <$> readFile filePath
-  mapM_ runLine code
+  mapM_ (runLine filePath) code
 
 mainWithArgs :: [String] -> IO ()
 mainWithArgs args = do
