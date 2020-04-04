@@ -21,7 +21,7 @@ data ErrorMessage =
     }
 
 instance Show ErrorMessage where
-    show (ErrorMessage msg pos) = (show pos) <> ": " <> msg
+    show (ErrorMessage msg pos) = (show pos) <> ": Error: " <> msg
 
 data InterpreterError
   = SyntaxError ErrorMessage
