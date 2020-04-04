@@ -20,9 +20,9 @@ import System.Console.ANSI
 import System.Environment (getArgs)
 import System.IO (hFlush, stdout)
 
-runLine :: FilePath -> String -> StateT Scope IO ()
-runLine path inp =
-  case runParser parseInterpreterCommand $ ParserInputStream 0 inp path of
+runLine :: FilePath -> (Int, String) -> StateT Scope IO ()
+runLine path (line, inp) =
+  case runParser parseInterpreterCommand $ ParserInputStream 1 line inp path of
     Left err -> printError err
     Right (resStr, command) -> do
       case command of
@@ -47,13 +47,13 @@ repl = do
   input <- lift getLine
   case input of
     [] -> return ()
-    someInput -> runLine "<interactive>" someInput
+    someInput -> runLine "<interactive>" (0, someInput)
   repl
 
 interpretFile :: FilePath -> StateT Scope IO ()
 interpretFile filePath = do
   lift $ putStrLn $ "Loading file '" <> filePath <> "'"
-  code <- lift $ lines <$> readFile filePath
+  code <- lift $ (zipWith (,) [1 ..] . lines) <$> readFile filePath
   mapM_ (runLine filePath) code
 
 mainWithArgs :: [String] -> IO ()

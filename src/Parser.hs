@@ -12,6 +12,7 @@ import Types
 data ParserInputStream =
   ParserInputStream
     { streamPosition :: Int
+    , streamLine :: Int
     , streamBegin :: String
     , streamFileName :: String
     }
@@ -47,22 +48,22 @@ instance MonadFail Parser where
 getPosition :: Parser TokenPosition
 getPosition =
   Parser $ \input ->
-    Right (input, TokenPosition (streamFileName input) 0 (streamPosition input))
+    Right (input, TokenPosition (streamFileName input) (streamLine input) (streamPosition input))
 
 failedParser :: String -> Parser a
 failedParser msg =
-  Parser $ \(ParserInputStream pos _ fileName) ->
-    Left $ SyntaxError $ ErrorMessage msg $ TokenPosition fileName 0 pos
+  Parser $ \(ParserInputStream pos line _ fileName) ->
+    Left $ SyntaxError $ ErrorMessage msg $ TokenPosition fileName line pos
 
 expectChar :: Char -> Parser ()
 expectChar c =
   Parser $ \case
-    (ParserInputStream pos (c':rest) fileName)
-      | c' == c -> Right (ParserInputStream (pos + 1) rest fileName, ())
-    (ParserInputStream pos _ fileName) ->
+    (ParserInputStream pos line (c':rest) fileName)
+      | c' == c -> Right (ParserInputStream (pos + 1) line rest fileName, ())
+    (ParserInputStream pos line _ fileName) ->
       Left $
       SyntaxError $
-      ErrorMessage ("Expected '" <> [c] <> "'") $ TokenPosition fileName 0 pos
+      ErrorMessage ("Expected '" <> [c] <> "'") $ TokenPosition fileName line pos
 
 expectOP :: Parser ()
 expectOP = expectChar '('
@@ -73,12 +74,12 @@ ws =
   many $
   Parser
     (\case
-       ParserInputStream pos (x:xs) fileName
-         | isSpace x -> Right $ (ParserInputStream pos xs fileName, ())
-       ParserInputStream pos _ fileName ->
+       ParserInputStream pos line (x:xs) fileName
+         | isSpace x -> Right $ (ParserInputStream (pos + 1) line xs fileName, ())
+       ParserInputStream pos line _ fileName ->
          Left $
          SyntaxError $
-         ErrorMessage "Expected whitespace" $ TokenPosition fileName 0 pos)
+         ErrorMessage "Expected whitespace" $ TokenPosition fileName line pos)
 
 expectCP :: Parser ()
 expectCP = expectChar ')'
@@ -92,16 +93,16 @@ expectDot = expectChar '.'
 parseIdentifier :: Parser String
 parseIdentifier =
   Parser $ \inp ->
-    let ParserInputStream pos streamHead fileName = inp
+    let ParserInputStream pos line streamHead fileName = inp
      in case span isAlphaNum streamHead of
           ([], rest) ->
             Left $
             SyntaxError $
             ErrorMessage ("Expected an identifier but got '" <> rest <> "'") $
-            TokenPosition fileName 0 pos
+            TokenPosition fileName line pos
           (identifier, rest) ->
             Right
-              ( ParserInputStream (pos + length identifier) rest fileName
+              ( ParserInputStream (pos + length identifier) line rest fileName
               , identifier)
 
 parenthesized :: Parser a -> Parser a
