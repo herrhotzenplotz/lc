@@ -37,8 +37,8 @@ runLine path line inp =
                putStrLn $
                  path <>
                  ":" <>
-                 (show $ streamPosition resStr) <>
-                 ": Warning: Incomplete parse: " <> (streamBegin resStr)
+                 show (streamPosition resStr) <>
+                 ": Warning: Incomplete parse: " <> streamBegin resStr
                setSGR []
 
 repl :: StateT Scope IO ()
@@ -54,11 +54,10 @@ repl = do
 interpretFile :: FilePath -> StateT Scope IO ()
 interpretFile filePath = do
   lift $ putStrLn $ "Loading file '" <> filePath <> "'"
-  code <- lift $ (zipWith (,) [1 ..] . lines) <$> readFile filePath
+  code <- lift $ zip [1 ..] . lines <$> readFile filePath
   forM_ code $ \line -> do
-    lift $ putStrLn $ ">>" <> (snd line)
+    lift $ putStrLn $ ">>" <> snd line
     uncurry (runLine filePath) line
-
 
 mainWithArgs :: [String] -> IO ()
 mainWithArgs args = do

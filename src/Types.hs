@@ -7,10 +7,12 @@ data TokenPosition =
     { positionFile :: String
     , positionLine :: Int
     , positionColumn :: Int
-    } deriving Eq
+    }
+  deriving (Eq)
 
 instance Show TokenPosition where
-    show (TokenPosition file line col) = file <> ":" <> (show line) <> ":" <> (show col)
+  show (TokenPosition file line col) =
+    file <> ":" <> show line <> ":" <> show col
 
 data Term
   = Variable String TokenPosition

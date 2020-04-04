@@ -48,7 +48,12 @@ instance MonadFail Parser where
 getPosition :: Parser TokenPosition
 getPosition =
   Parser $ \input ->
-    Right (input, TokenPosition (streamFileName input) (streamLine input) (streamPosition input))
+    Right
+      ( input
+      , TokenPosition
+          (streamFileName input)
+          (streamLine input)
+          (streamPosition input))
 
 failedParser :: String -> Parser a
 failedParser msg =
@@ -63,10 +68,21 @@ expectChar c =
     (ParserInputStream pos line _ fileName) ->
       Left $
       SyntaxError $
-      ErrorMessage ("Expected '" <> [c] <> "'") $ TokenPosition fileName line pos
+      ErrorMessage ("Expected '" <> [c] <> "'") $
+      TokenPosition fileName line pos
 
 expectOP :: Parser ()
 expectOP = expectChar '('
+
+eof :: Parser ()
+eof =
+  Parser $ \case
+    stream@(ParserInputStream _ _ [] _) -> Right (stream, ())
+    (ParserInputStream pos line rest fileName) ->
+      Left $
+      SyntaxError $
+      ErrorMessage ("Expected EOF but got '" <> rest <> "' instead") $
+      TokenPosition fileName line pos
 
 ws :: Parser ()
 ws =
@@ -75,7 +91,7 @@ ws =
   Parser
     (\case
        ParserInputStream pos line (x:xs) fileName
-         | isSpace x -> Right $ (ParserInputStream (pos + 1) line xs fileName, ())
+         | isSpace x -> Right (ParserInputStream (pos + 1) line xs fileName, ())
        ParserInputStream pos line _ fileName ->
          Left $
          SyntaxError $

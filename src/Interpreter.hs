@@ -49,12 +49,15 @@ parseTerm :: Parser Term
 parseTerm =
   ws *> (parseApplication <|> parseAbstraction <|> parseVariable) <* ws
 
+parseLine :: Parser Term
+parseLine = parseTerm <* eof
+
 parseLetBinding :: Parser InterpreterCommand
 parseLetBinding = do
   ws *> expectString "let" <* ws
   binding <- ws *> parseIdentifier <* ws
   expectChar '='
-  LetBinding binding <$> parseTerm
+  LetBinding binding <$> parseLine
 
 parseReleaseCommand :: Parser InterpreterCommand
 parseReleaseCommand = do
@@ -62,7 +65,7 @@ parseReleaseCommand = do
   Release <$> parseIdentifier
 
 parseEvalCommand :: Parser InterpreterCommand
-parseEvalCommand = EvalCommand <$> parseTerm
+parseEvalCommand = EvalCommand <$> (parseLine <* eof)
 
 parseInterpreterCommand :: Parser InterpreterCommand
 parseInterpreterCommand =
@@ -87,8 +90,10 @@ interpretScoped :: Scope -> Term -> InterpreterResult
 interpretScoped scope (Variable v pos) =
   case M.lookup v scope of
     Just term -> return term
-    Nothing -> Left $ SemanticError $ ErrorMessage ("Unbound value '" <> v <> "'") pos
-interpretScoped scope (Abstraction arg body pos) = Right $ Closure arg body scope pos
+    Nothing ->
+      Left $ SemanticError $ ErrorMessage ("Unbound value '" <> v <> "'") pos
+interpretScoped scope (Abstraction arg body pos) =
+  Right $ Closure arg body scope pos
 interpretScoped scope (Application f val pos) = do
   fEval <- interpretScoped scope f
   case fEval of
@@ -97,7 +102,8 @@ interpretScoped scope (Application f val pos) = do
       let newScope = M.insert f' valEval closedScope
       let forEvaluation = M.union scope newScope
       interpretScoped forEvaluation body
-    _ -> Left $ SemanticError $ ErrorMessage "Cannot apply non-function values" pos
+    _ ->
+      Left $ SemanticError $ ErrorMessage "Cannot apply non-function values" pos
 interpretScoped _ closure = return closure
 
 eval :: Term -> StateT Scope IO ()
@@ -107,8 +113,7 @@ eval inp = do
     Right result -> do
       result' <- showTerm result
       lift $ putStrLn $ ":: " <> result'
-    Left err -> do
-      printError err
+    Left err -> printError err
 
 bind :: String -> Term -> StateT Scope IO ()
 bind name body = do
