@@ -17,22 +17,20 @@ import Types
 data ErrorMessage =
   ErrorMessage
     { errorMessageText :: String
-    , errorMessageFile :: String
-    , errorMessageLine :: Int
-    , errorMessageColumn :: Int
+    , errorPosition :: TokenPosition
     }
 
 instance Show ErrorMessage where
-    show (ErrorMessage msg file line col) = file <> ":" <> (show line) <> ":" <> (show col) <> ": " <> msg
+    show (ErrorMessage msg pos) = (show pos) <> ": " <> msg
 
 data InterpreterError
   = SyntaxError ErrorMessage
-  | SemanticError String
+  | SemanticError ErrorMessage
   | InternalError String
   deriving (Show)
 
 instance Alternative (Either InterpreterError) where
-  empty = Left $ SyntaxError $ ErrorMessage "Empty error" "no-file" 0 0
+  empty = Left $ SyntaxError $ ErrorMessage "Empty error" $ TokenPosition "no-file" 0 0
   Left _ <|> err = err
   ei1 <|> _ = ei1
 
