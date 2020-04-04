@@ -107,7 +107,8 @@ eval inp = do
     Right result -> do
       result' <- showTerm result
       lift $ putStrLn $ ":: " <> result'
-    Left err -> printError err
+    Left err -> do
+      printError err
 
 bind :: String -> Term -> StateT Scope IO ()
 bind name body = do

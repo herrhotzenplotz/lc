@@ -23,6 +23,12 @@ data ErrorMessage =
 instance Show ErrorMessage where
     show (ErrorMessage msg pos) = (show pos) <> ": Error: " <> msg
 
+printPositionIndicator :: ErrorMessage -> IO ()
+printPositionIndicator errorMsg =
+  putStrLn $
+-- v--- this depends on the length of the prompt
+  "~" <> (replicate (positionColumn $ errorPosition errorMsg)) '~' <> "^"
+
 data InterpreterError
   = SyntaxError ErrorMessage
   | SemanticError ErrorMessage
@@ -37,12 +43,16 @@ instance Alternative (Either InterpreterError) where
 printError :: InterpreterError -> StateT Scope IO ()
 printError err =
   lift $ do
-    setSGR [SetColor Foreground Vivid Red]
     case err of
       SemanticError x -> do
+        printPositionIndicator x
+        switchToRed
         putStrLn $ show x
       SyntaxError x -> do
+        printPositionIndicator x
+        switchToRed
         putStrLn $ show x
-      InternalError msg ->
-        putStr $ "?: Internal interpreter error: " <> msg
+      InternalError msg -> putStr $ "?: Internal interpreter error: " <> msg
     setSGR []
+  where
+    switchToRed = setSGR [SetColor Foreground Vivid Red]
