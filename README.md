@@ -21,6 +21,13 @@ $ stack run
 + `let false = \x.\y.y`
 + `let not = \b.((b false) true)`
 + `(not false)`
++ `release true` (removes globally bound true)
+
+## Loading files
+
+```bash
+$ lc bool.lc fixpoint.lc
+```
 
 ## Notes
 Because the interpreter internally uses closures, you might sometimes
