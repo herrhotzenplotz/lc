@@ -8,10 +8,10 @@ Just something I did in my spare time.
 
 ```bash
 $ git clone git@github.com:herrhotzenplotz/lc
-$ cd lc/
-$ stack build
-$ stack run
+$ cd lc/src/
+$ runhugs -98 Main.hs
 ```
+You may want to use my [Fork of Hugs](https://gitlab.com/herrhotzenplotz/hugs98). I'd strongly recommend it :)
 
 ## Examples to try
 
