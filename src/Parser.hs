@@ -3,9 +3,10 @@
 
 module Parser where
 
-import Control.Applicative (Alternative(..))
-import Control.Monad (void)
+import Control.Applicative
+import Control.Monad
 import Data.Char (isAlphaNum, isSpace)
+import Data.Monoid
 import Error
 import Types
 
@@ -22,11 +23,19 @@ newtype Parser a =
     { runParser :: ParserInputStream -> Either InterpreterError ( ParserInputStream
                                                                 , a)
     }
-  deriving (Functor)
+
+instance Monad (Either InterpreterError) where
+  Left x >>= _ = Left x
+  Right x >>= f = f x
+  return = pure
+
+instance Functor Parser where
+  fmap f p = Parser $ \input ->
+    fmap f <$> (runParser p input)
 
 instance Applicative Parser where
   pure x = Parser $ \input -> Right (input, x)
-  Parser f <*> Parser p =
+  (Parser f) <*> (Parser p) =
     Parser $ \input -> do
       (input', f') <- f input
       (input'', res) <- p input'
@@ -41,9 +50,10 @@ instance Monad Parser where
     Parser $ \input -> do
       (input', a) <- p1 input
       runParser (f a) input'
+  return x = pure x
 
-instance MonadFail Parser where
-  fail msg = Parser $ const $ Left $ InternalError msg
+void :: Functor f => f a -> f ()
+void x = () <$ x
 
 getPosition :: Parser TokenPosition
 getPosition =
@@ -62,40 +72,43 @@ failedParser msg =
 
 expectChar :: Char -> Parser ()
 expectChar c =
-  Parser $ \case
-    (ParserInputStream pos line (c':rest) fileName)
-      | c' == c -> Right (ParserInputStream (pos + 1) line rest fileName, ())
-    (ParserInputStream pos line _ fileName) ->
-      Left $
-      SyntaxError $
-      ErrorMessage ("Expected '" <> [c] <> "'") $
-      TokenPosition fileName line pos
+  Parser $ \inp -> 
+    case inp of
+      (ParserInputStream pos line (c':rest) fileName)
+        | c' == c -> Right (ParserInputStream (pos + 1) line rest fileName, ())
+      (ParserInputStream pos line _ fileName) ->
+        Left $
+        SyntaxError $
+        ErrorMessage ("Expected '" <> [c] <> "'") $
+        TokenPosition fileName line pos
 
 expectOP :: Parser ()
 expectOP = expectChar '('
 
 eof :: Parser ()
 eof =
-  Parser $ \case
-    stream@(ParserInputStream _ _ [] _) -> Right (stream, ())
-    (ParserInputStream pos line rest fileName) ->
-      Left $
-      SyntaxError $
-      ErrorMessage ("Expected EOF but got '" <> rest <> "' instead") $
-      TokenPosition fileName line pos
+  Parser $ \inp ->
+    case inp of
+      stream@(ParserInputStream _ _ [] _) -> Right (stream, ())
+      (ParserInputStream pos line rest fileName) ->
+        Left $
+        SyntaxError $
+        ErrorMessage ("Expected EOF but got '" <> rest <> "' instead") $
+        TokenPosition fileName line pos
 
 ws :: Parser ()
 ws =
   void $
   many $
   Parser
-    (\case
-       ParserInputStream pos line (x:xs) fileName
-         | isSpace x -> Right (ParserInputStream (pos + 1) line xs fileName, ())
-       ParserInputStream pos line _ fileName ->
-         Left $
-         SyntaxError $
-         ErrorMessage "Expected whitespace" $ TokenPosition fileName line pos)
+    (\inp -> 
+      case inp of
+        ParserInputStream pos line (x:xs) fileName
+          | isSpace x -> Right (ParserInputStream (pos + 1) line xs fileName, ())
+        ParserInputStream pos line _ fileName ->
+          Left $
+          SyntaxError $
+          ErrorMessage "Expected whitespace" $ TokenPosition fileName line pos)
 
 expectCP :: Parser ()
 expectCP = expectChar ')'

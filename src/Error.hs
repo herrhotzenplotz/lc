@@ -2,17 +2,11 @@
 
 module Error where
 
-import Control.Applicative (Alternative(..))
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict
-import System.Console.ANSI
-  ( Color(..)
-  , ColorIntensity(..)
-  , ConsoleLayer(..)
-  , SGR(..)
-  , setSGR
-  )
+import Control.Applicative (Applicative(..),Alternative(..))
+import Control.Monad.Trans(lift)
+import Control.Monad.State
 import Types
+import Data.Monoid
 
 data ErrorMessage =
   ErrorMessage
@@ -35,6 +29,9 @@ data InterpreterError
   | InternalError String
   deriving (Show)
 
+instance Applicative (Either InterpreterError) where
+  pure = Right
+
 instance Alternative (Either InterpreterError) where
   empty =
     Left $
@@ -49,12 +46,8 @@ printError err =
       SemanticError x -> printFormattedError x
       SyntaxError x -> printFormattedError x
       InternalError msg -> putStr $ "?: Internal interpreter error: " <> msg
-    setSGR []
   where
-    switchToRed :: IO ()
-    switchToRed = setSGR [SetColor Foreground Vivid Red]
     printFormattedError :: ErrorMessage -> IO ()
     printFormattedError x = do
       printPositionIndicator x
-      switchToRed
       print x

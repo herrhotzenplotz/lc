@@ -4,17 +4,11 @@ import Error
 import Parser
 import Types
 
-import Control.Applicative (Alternative(..))
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict
-import qualified Data.Map.Strict as M
-import System.Console.ANSI
-  ( Color(..)
-  , ColorIntensity(..)
-  , ConsoleLayer(..)
-  , SGR(..)
-  , setSGR
-  )
+import Control.Applicative
+import Control.Monad.Trans (lift)
+import Control.Monad.State
+import qualified Data.Map as M
+import Data.Monoid
 
 type InterpreterResult = Either InterpreterError Term
 
@@ -99,7 +93,7 @@ interpretScoped scope (Application f val pos) = do
   case fEval of
     Closure f' body closedScope _ -> do
       valEval <- interpretScoped scope val
-      let newScope = M.insert f' valEval closedScope
+      let newScope = M.insert f' valEval closedScope -- \x.x 2 (valEval : 2, f' : "x", body : "x")
       let forEvaluation = M.union scope newScope
       interpretScoped forEvaluation body
     _ ->
@@ -131,7 +125,4 @@ release binding = do
     then do
       put $ M.delete binding globalScope
       lift $ putStrLn $ ":: '" <> binding <> "' has been released."
-    else lift $ do
-           setSGR [SetColor Foreground Vivid Red]
-           putStrLn $ "?: '" <> binding <> "': No such binding."
-           setSGR []
+    else lift $ putStrLn $ "?: '" <> binding <> "': No such binding."

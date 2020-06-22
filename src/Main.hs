@@ -5,19 +5,13 @@ import Interpreter
 import Parser
 import Types
 
+import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict
-import qualified Data.Map.Strict as M
+import Control.Monad.Trans(lift)
+import Control.Monad.State
+import qualified Data.Map as M
+import Data.Monoid
 import Data.Version (showVersion)
-import Paths_lc (version)
-import System.Console.ANSI
-  ( Color(..)
-  , ColorIntensity(..)
-  , ConsoleLayer(..)
-  , SGR(..)
-  , setSGR
-  )
 import System.Environment (getArgs)
 import System.IO (hFlush, stdout)
 
@@ -33,13 +27,11 @@ runLine path line inp =
       if null $ streamBegin resStr
         then return ()
         else lift $ do
-               setSGR [SetColor Foreground Vivid Magenta]
                putStrLn $
                  path <>
                  ":" <>
                  show (streamPosition resStr) <>
                  ": Warning: Incomplete parse: " <> streamBegin resStr
-               setSGR []
 
 repl :: StateT Scope IO ()
 repl = do
@@ -67,6 +59,6 @@ mainWithArgs args = do
 main :: IO ()
 main = do
   putStrLn "lc - untyped lambda calculus interpreter"
-  putStrLn $ "Version " <> showVersion version
+  putStrLn $ "Version 1.0 for Hugs"
   putStrLn "Copyright 2020 by Nico Sonack\n"
   getArgs >>= mainWithArgs
